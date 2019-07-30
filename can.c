@@ -4,14 +4,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <linux/can.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/unistd.h>
 #include <sys/fcntl.h>
+#include <sys/socket.h>
 
-int receive_can(int socket, struct can_frame *cf);
+int recv_can(int socket, struct can_frame *cf);
+int send_can(int socket, struct can_frame *cf);
+void dump_can(struct can_frame *cf);
 
 int main(int argc, char *argv[])
 {
@@ -47,54 +49,81 @@ int main(int argc, char *argv[])
     }
     //can bus frame for receive and send
     while (1) {
-	struct can_frame r_frame, s_frame;
-	size_t nbytes;
-	size_t index = 0;
+	struct can_frame *r_frame, *s_frame;
 
-	if (receive_can(s, &r_frame) == 0) {
-	    printf("revice a can frame, can id: %x,", r_frame.can_id);
-	    while (index < r_frame.can_dlc)
-		printf(" %x", r_frame.data[index]);
-	    printf("\n\r");
+	r_frame = calloc(1, sizeof(*r_frame));
+	s_frame = calloc(1, sizeof(*s_frame));
+
+	if (recv_can(s, r_frame) == 0) {
+	    dump_can(r_frame);
 	}
+
+	free(r_frame);
 	//can frame id
-	s_frame.can_id = 0x127;
+	s_frame->can_id = 0x127;
 	//can frame data length
-	s_frame.can_dlc = 4;
+	s_frame->can_dlc = 4;
 	//can frame data
-	s_frame.data[0] = 0xDE;
-	s_frame.data[1] = 0xAD;
-	s_frame.data[2] = 0xBE;
-	s_frame.data[3] = 0xEF;
+	s_frame->data[0] = 0xDE;
+	s_frame->data[1] = 0xAD;
+	s_frame->data[2] = 0xBE;
+	s_frame->data[3] = 0xEF;
 
-	//send can frame
-	nbytes = write(s, &s_frame, sizeof(s_frame));
+	if (send_can(s, s_frame) == 0)
+	    dump_can(s_frame);
 
-	if (nbytes != sizeof(s_frame))
-	    printf("error: can write fail\n\r");
+	sleep(1);
     }
 }
 
-int receive_can(int socket, struct can_frame *cf)
+int recv_can(int socket, struct can_frame *cf)
 {
     size_t nbytes;
 
     if (socket == 0) {
-	printf("socket file desc error.\n\r");
+	printf("error: socket file desc error.\n\r");
 	return -2;
     }
 
     nbytes = read(socket, cf, sizeof(*cf));
 
-    if (nbytes < 0) {
-	printf("no can frame.\n\r");
+    if (nbytes != sizeof(*cf)) {
+	printf("error: can frame read fail.\n\r");
 	return -1;
     }
 
-    if (nbytes < sizeof(*cf)) {
-	printf("can frame read fail.\n\r");
-	return -1;
-    }
-
+    printf("info: recv a can frame.\n\r");
     return 0;
+}
+
+int send_can(int socket, struct can_frame *cf)
+{
+    size_t nbytes;
+
+    if (socket == 0) {
+	printf("error: socket file desc error.\n\r");
+	return -2;
+    }
+
+    nbytes = write(socket, cf, sizeof(*cf));
+
+    if (nbytes != sizeof(*cf)) {
+	printf("error: can frame write fail.\n\r");
+	return -1;
+    }
+
+    printf("info: send a can frame.\n\r");
+    return 0;
+}
+
+void dump_can(struct can_frame *cf)
+{
+    size_t index = 0;
+
+    printf("info: a can frame, can id: %x,", cf->can_id);
+    while (index < cf->can_dlc) {
+	printf(" %x", cf->data[index]);
+	index++;
+    }
+    printf("\n\r");
 }
