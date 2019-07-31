@@ -72,6 +72,7 @@ int main(int argc, char *argv[])
 	if (send_can(s, s_frame) == 0)
 	    dump_can(s_frame);
 
+	free(s_frame);
 	sleep(1);
     }
 }
@@ -120,7 +121,7 @@ void dump_can(struct can_frame *cf)
 {
     size_t index = 0;
 
-    printf("info: a can frame, can id: %x,", cf->can_id);
+    printf("info: can frame, can id: %x,", cf->can_id);
     while (index < cf->can_dlc) {
 	printf(" %x", cf->data[index]);
 	index++;
